@@ -1,0 +1,2 @@
+ALTER TABLE "Page" ADD COLUMN IF NOT EXISTS "directAnswer" TEXT;
+ALTER TABLE "LandingPage" ADD COLUMN IF NOT EXISTS "directAnswer" TEXT;

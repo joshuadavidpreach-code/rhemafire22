@@ -1,0 +1,217 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("ADMIN") // ADMIN or MEMBER
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  posts     Post[]
+  entitlements UserEntitlement[]
+}
+
+model Page {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String   @unique
+  status      String   @default("published") // draft|scheduled|published
+  contentHtml String   @default("")
+  contentJson String   @default("[]")
+  metaTitle   String?
+  metaDesc    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Post {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String   @unique
+  status      String   @default("published")
+  excerpt     String   @default("")
+  contentHtml String   @default("")
+  contentJson String   @default("[]")
+  directAnswer String?
+
+  metaTitle   String?
+  metaDesc    String?
+
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Course {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String   @unique
+  status      String   @default("published")
+  summary     String   @default("")
+  descriptionHtml String @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lessons     Lesson[]
+}
+
+model Lesson {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String
+  status      String   @default("published")
+  summaryHtml String   @default("")
+  youtubeUrl  String
+  youtubeId   String
+  transcript  String   @default("")
+  publicExcerpt String @default("")
+  previewEnabled Boolean @default(true)
+  previewIndexable Boolean @default(true)
+
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([courseId, slug])
+}
+
+model Optin {
+  id        String   @id @default(uuid())
+  email     String
+  firstName String?
+  source    String?
+  createdAt DateTime @default(now())
+}
+
+model ContactMessage {
+  id        String   @id @default(uuid())
+  name      String?
+  email     String
+  subject   String?
+  message   String
+  type      String   @default("contact") // contact|invite
+  createdAt DateTime @default(now())
+}
+
+model Redirect {
+  id        String   @id @default(uuid())
+  fromPath  String   @unique
+  toPath    String
+  status    Int      @default(301)
+  createdAt DateTime @default(now())
+}
+
+model MembershipTier {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  entitlements UserEntitlement[]
+}
+
+model UserEntitlement {
+  id        String   @id @default(uuid())
+  userId    String
+  tierId    String
+  source    String   @default("system") // system|stripe|admin_override
+  active    Boolean  @default(true)
+  startsAt  DateTime @default(now())
+  endsAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  tier MembershipTier @relation(fields: [tierId], references: [id])
+
+  @@index([userId, active])
+}
+
+model SiteSetting {
+  key       String   @id
+  value     String   @default("")
+  updatedAt DateTime @updatedAt
+}
+
+model LandingPage {
+  directAnswer String?
+  id          String   @id @default(uuid())
+  title       String
+  slug        String   @unique
+  status      String   @default("published") // draft|scheduled|published
+  contentHtml String   @default("")
+  contentJson String   @default("[]")
+  metaTitle   String?
+  metaDesc    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model EmailSequence {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  steps EmailStep[]
+  subscribers EmailSubscriber[]
+}
+
+model EmailStep {
+  id          String   @id @default(uuid())
+  sequenceId  String
+  dayOffset   Int      // days after opt-in to send
+  subject     String
+  bodyHtml    String
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  sequence EmailSequence @relation(fields: [sequenceId], references: [id])
+}
+
+model EmailSubscriber {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  firstName   String?
+  sequenceId  String
+  currentStep Int      @default(0)
+  optedInAt   DateTime @default(now())
+  nextSendAt  DateTime
+  status      String   @default("active") // active|unsubscribed|paused|bounced
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sequence EmailSequence @relation(fields: [sequenceId], references: [id])
+  sends EmailSendLog[]
+}
+
+model EmailSendLog {
+  id            String   @id @default(uuid())
+  subscriberId  String
+  stepId        String?
+  toEmail       String
+  subject       String
+  status        String   @default("queued") // queued|sent|failed
+  provider      String   @default("smtp")
+  error         String?
+  sentAt        DateTime @default(now())
+
+  subscriber EmailSubscriber @relation(fields: [subscriberId], references: [id])
+}
